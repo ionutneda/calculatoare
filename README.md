@@ -1,0 +1,1 @@
+Calculatoare segmente - intuitiv
