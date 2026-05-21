@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculator Bandă LED</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:#f4f1ec; --surface:#ffffff; --surface2:#ede9e1; --border:#ddd8ce; --border2:#c5bfb4;
+  --ink:#1c1a17; --ink2:#5c574f; --ink3:#9c978f;
+  --red:#c0392b; --blue:#1a56a0; --gold:#a0620a; --green:#1a6640; --teal:#0e7c6e; --purple:#6b3fa0;
+  --mono:'DM Mono',monospace; --sans:'Syne',sans-serif; --r:3px;
+}
+body { background:var(--bg); color:var(--ink); font-family:var(--sans); min-height:100vh; padding:28px 16px 80px; }
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:repeating-linear-gradient(transparent,transparent 31px,rgba(160,150,130,.12) 31px,rgba(160,150,130,.12) 32px);
+}
+.wrap { max-width:900px; margin:0 auto; position:relative; z-index:1; }
+
+/* HEADER */
+.hdr { margin-bottom:32px; }
+.hdr-tag { font-family:var(--mono); font-size:10px; color:var(--teal); letter-spacing:3px; text-transform:uppercase; margin-bottom:6px; }
+.hdr h1 { font-size:38px; font-weight:800; line-height:1; letter-spacing:-1px; }
+.hdr h1 em { color:var(--teal); font-style:normal; }
+.hdr-sub { font-family:var(--mono); font-size:11px; color:var(--ink3); margin-top:7px; font-weight:300; }
+
+/* PANEL */
+.panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:20px 22px; margin-bottom:12px; }
+.ptitle {
+  font-family:var(--mono); font-size:10px; font-weight:500; color:var(--ink3);
+  letter-spacing:3px; text-transform:uppercase; margin-bottom:14px;
+  padding-bottom:9px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:7px;
+}
+.ptitle::before { content:''; width:5px; height:5px; border-radius:50%; background:var(--teal); flex-shrink:0; }
+
+/* SETTINGS */
+.settings-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+.settings-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }
+.field label { display:block; font-family:var(--mono); font-size:10px; color:var(--ink3); letter-spacing:2px; text-transform:uppercase; margin-bottom:5px; }
+.field-note { font-family:var(--mono); font-size:10px; color:var(--ink3); margin-top:4px; }
+input[type="number"], input[type="text"] {
+  width:100%; background:var(--bg); border:1px solid var(--border2); color:var(--ink);
+  font-family:var(--mono); font-size:14px; padding:8px 11px; border-radius:var(--r); outline:none; transition:border-color .15s;
+}
+input:focus { border-color:var(--teal); background:#fff; }
+
+/* PITCH */
+.pitch-presets { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:8px; }
+.pitch-btn {
+  font-family:var(--mono); font-size:11px; padding:5px 12px;
+  border:1px solid var(--border2); border-radius:var(--r); background:var(--bg);
+  cursor:pointer; transition:all .15s; color:var(--ink2);
+}
+.pitch-btn:hover { border-color:var(--teal); color:var(--teal); }
+.pitch-btn.active { background:var(--teal); color:#fff; border-color:var(--teal); }
+
+/* NECESARE LIST */
+.nec-header {
+  display:grid;
+  grid-template-columns: minmax(140px,2fr) minmax(80px,1fr) minmax(80px,1fr) 32px;
+  gap:8px; margin-bottom:4px; padding:0 2px;
+  align-items:center;
+}
+.nec-header span { font-family:var(--mono); font-size:9px; color:var(--ink3); letter-spacing:1.5px; text-transform:uppercase; }
+.nec-list { display:flex; flex-direction:column; gap:7px; margin-bottom:10px; }
+.nec-row {
+  display:grid;
+  grid-template-columns: minmax(140px,2fr) minmax(80px,1fr) minmax(80px,1fr) 32px;
+  gap:8px; align-items:center;
+}
+.nec-row input[type="text"]   { width:100%; }
+.nec-row input[type="number"] { width:100%; }
+.nec-unit { font-family:var(--mono); font-size:10px; color:var(--ink3); white-space:nowrap; padding-left:2px; }
+.nec-del {
+  background:transparent; border:1px solid var(--border2); color:var(--ink3);
+  padding:0; width:32px; height:34px; border-radius:var(--r); cursor:pointer; font-size:13px;
+  transition:all .15s; display:flex; align-items:center; justify-content:center;
+}
+.nec-del:hover { border-color:var(--red); color:var(--red); }
+
+/* BUTTONS */
+.btn-row { display:flex; gap:9px; margin-top:14px; flex-wrap:wrap; }
+button {
+  font-family:var(--sans); font-size:12px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+  padding:10px 20px; border:none; border-radius:var(--r); cursor:pointer; transition:all .15s;
+}
+.btn-calc   { background:var(--teal); color:#fff; }
+.btn-calc:hover   { background:#085e52; transform:translateY(-1px); box-shadow:0 4px 14px rgba(14,124,110,.25); }
+.btn-export { background:var(--green); color:#fff; }
+.btn-export:hover { background:#124d30; transform:translateY(-1px); }
+.btn-ghost  { background:transparent; color:var(--ink2); border:1.5px solid var(--border2); font-family:var(--mono); font-weight:400; }
+.btn-ghost:hover  { border-color:var(--ink2); }
+.btn-add    { background:transparent; border:1.5px dashed var(--border2); color:var(--ink3); font-family:var(--mono); font-size:11px; font-weight:400; padding:7px 16px; }
+.btn-add:hover    { border-color:var(--teal); color:var(--teal); }
+.hint { font-family:var(--mono); font-size:10px; color:var(--ink3); margin-top:6px; }
+
+/* RESULTS */
+#results { display:none; margin-top:8px; }
+.res-header-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+.res-title { font-family:var(--mono); font-size:10px; color:var(--ink3); letter-spacing:3px; text-transform:uppercase; }
+
+/* RESULT CARD */
+.rcard { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); margin-bottom:10px; overflow:hidden; animation:fadeUp .22s ease both; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(7px)} to{opacity:1;transform:translateY(0)} }
+.rcard-head {
+  display:flex; align-items:center; flex-wrap:wrap; gap:10px;
+  padding:11px 16px; border-bottom:1px solid var(--border); background:var(--surface2);
+}
+.rcard-idx  { font-family:var(--mono); font-size:10px; color:var(--ink3); min-width:22px; }
+.rcard-name { font-family:var(--mono); font-size:13px; color:var(--ink2); }
+.rcard-dim  { font-family:var(--mono); font-size:18px; font-weight:500; color:var(--ink); }
+.rcard-dim small { font-size:12px; color:var(--ink3); font-weight:300; }
+.rcard-dim .arr  { color:var(--teal); margin:0 3px; }
+.rcard-src  { margin-left:auto; font-family:var(--mono); font-size:10px; color:var(--ink3); }
+.badge { font-family:var(--mono); font-size:9px; font-weight:500; letter-spacing:1px; text-transform:uppercase; padding:3px 8px; border-radius:2px; }
+.b-exact  { background:rgba(26,102,64,.1);  color:var(--green);  border:1px solid rgba(26,102,64,.2); }
+.b-rest   { background:rgba(160,98,10,.1);  color:var(--gold);   border:1px solid rgba(160,98,10,.2); }
+.b-reuse  { background:rgba(26,86,160,.1);  color:var(--blue);   border:1px solid rgba(26,86,160,.2); }
+.b-new    { background:rgba(14,124,110,.1); color:var(--teal);   border:1px solid rgba(14,124,110,.2); }
+.b-power  { background:rgba(107,63,160,.1); color:var(--purple); border:1px solid rgba(107,63,160,.2); }
+.rcard-body { padding:14px 16px; }
+
+/* Reel bar */
+.reel-wrap  { margin-bottom:12px; }
+.reel-label { font-family:var(--mono); font-size:9px; color:var(--ink3); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:5px; }
+.reel-bar   { display:flex; height:22px; border-radius:2px; overflow:hidden; border:1px solid var(--border2); background:var(--bg); }
+.reel-used  {
+  height:100%; background:linear-gradient(90deg,var(--teal),#17a892);
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:9px; color:#fff; font-weight:500; min-width:2px;
+}
+.reel-rest  {
+  height:100%;
+  background:repeating-linear-gradient(45deg,rgba(160,98,10,.15),rgba(160,98,10,.15) 3px,transparent 3px,transparent 6px);
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:9px; color:var(--gold);
+  border-left:2px dashed var(--gold);
+}
+
+/* Formula */
+.formula-block { background:var(--surface2); border:1px solid var(--border); border-radius:var(--r); padding:10px 14px; font-family:var(--mono); font-size:12px; }
+.fb-row { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-bottom:4px; }
+.fb-row:last-child { margin-bottom:0; }
+.fb-label { font-size:9px; color:var(--ink3); letter-spacing:1.5px; text-transform:uppercase; min-width:160px; }
+.fb-val        { color:var(--ink); }
+.fb-val.teal   { color:var(--teal); font-weight:500; }
+.fb-val.gold   { color:var(--gold); }
+.fb-val.blue   { color:var(--blue); }
+.fb-val.green  { color:var(--green); }
+.fb-val.purple { color:var(--purple); font-weight:500; }
+.fb-note       { font-size:10px; color:var(--ink3); margin-left:6px; }
+
+/* Power strip inside formula */
+.power-strip {
+  margin-top:10px; padding-top:10px; border-top:1px solid var(--border);
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+}
+.power-val {
+  display:flex; flex-direction:column; gap:2px;
+}
+.power-val .pv-label { font-family:var(--mono); font-size:9px; color:var(--ink3); letter-spacing:1.5px; text-transform:uppercase; }
+.power-val .pv-num   { font-family:var(--mono); font-size:18px; font-weight:500; color:var(--purple); line-height:1; }
+.power-val .pv-unit  { font-family:var(--mono); font-size:10px; color:var(--ink3); }
+.power-sep { color:var(--border2); font-size:20px; align-self:center; }
+
+/* SUMMARY */
+.summary { background:var(--ink); color:#f4f1ec; border-radius:var(--r); padding:22px 24px; margin-top:6px; }
+.sum-title { font-family:var(--mono); font-size:10px; letter-spacing:3px; text-transform:uppercase; color:#9a9590; margin-bottom:16px; }
+.sum-grid  { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:16px; }
+.sum-item .sl { font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:#6a6560; margin-bottom:3px; }
+.sum-item .sv { font-family:var(--mono); font-size:26px; font-weight:500; color:#f4f1ec; line-height:1; }
+.sum-item .su { font-family:var(--mono); font-size:10px; color:#9a9590; margin-top:2px; }
+.sum-item.teal   .sv { color:#6ecfc4; }
+.sum-item.gold   .sv { color:#e8b866; }
+.sum-item.green  .sv { color:#6ed49a; }
+.sum-item.purple .sv { color:#c4a3e8; }
+.sum-rests { border-top:1px solid #2a2a2a; margin-top:18px; padding-top:14px; }
+.sum-rests-title { font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:#6a6560; margin-bottom:8px; }
+.sum-rest-row { font-family:var(--mono); font-size:11px; color:#9a9590; padding:2px 0; }
+
+@media(max-width:680px) {
+  .settings-grid-3 { grid-template-columns:1fr 1fr; }
+  .settings-grid-2 { grid-template-columns:1fr; }
+  .nec-header, .nec-row { grid-template-columns:1fr 90px 90px 32px; }
+  .hdr h1 { font-size:28px; }
+  .sum-grid { grid-template-columns:1fr 1fr; }
+}
+@media(max-width:480px) {
+  .nec-header { display:none; }
+  .nec-row { grid-template-columns:1fr 80px 32px; }
+  .nec-row .col-power { display:none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hdr">
+    <div class="hdr-tag">Optimizare tăieri · Bandă LED</div>
+    <h1>Calculator<br><em>Bandă LED</em></h1>
+    <div class="hdr-sub">Rotunjire la pas · Alocare din role · Reutilizare completă resturi · Calcul putere · Export Excel</div>
+    <div class="hdr-sub"><a href="index.html">CALCULATOR SEGMENTE</a></div>
+  </header>
+
+  <!-- CONFIGURARE -->
+  <div class="panel">
+    <div class="ptitle">Configurare produs</div>
+    <div class="settings-grid-3">
+      <div class="field">
+        <label>Lungime rolă (cm)</label>
+        <input type="number" id="lungimeRola" value="500" min="1" step="0.1">
+        <div class="field-note">ex: 500 cm = 5 m</div>
+      </div>
+      <div class="field">
+        <label>Pas de tăiere (cm)</label>
+        <div class="pitch-presets">
+          <button class="pitch-btn active" id="btnStandard" onclick="setPitchMode('standard')">50 mm (5 cm)</button>
+          <button class="pitch-btn" id="btnCustom" onclick="setPitchMode('custom')">Custom</button>
+        </div>
+        <input type="number" id="pasTaiere" value="5" min="0.1" step="0.1" style="display:none;" oninput="syncCustom()">
+        <div class="field-note" id="pitchNote">Pas fix: 5 cm (50 mm)</div>
+      </div>
+      <div class="field">
+        <label>Putere bandă (W/m)</label>
+        <input type="number" id="putereWm" value="" min="0" step="0.1" placeholder="ex: 14.4">
+        <div class="field-note">Opțional — pentru calcul putere</div>
+      </div>
+    </div>
+    <div class="settings-grid-2">
+      <div class="field">
+        <label>Denumire produs / lot (opțional)</label>
+        <input type="text" id="prodName" placeholder="ex: Bandă LED 24V 4000K 14.4W/m">
+      </div>
+      <div class="field">
+        <label>Zecimale afișate</label>
+        <input type="number" id="zecimale" value="2" min="0" max="4" step="1">
+      </div>
+    </div>
+  </div>
+
+  <!-- NECESARE -->
+  <div class="panel">
+    <div class="ptitle">Lista necesare</div>
+    <div class="nec-header">
+      <span>Denumire / locație (opțional)</span>
+      <span>Lungime (cm)</span>
+      <span>Putere W/m</span>
+      <span></span>
+    </div>
+    <div class="nec-list" id="necList"></div>
+    <button class="btn-add" onclick="addRow()">+ Adaugă rând</button>
+    <div class="hint">Puterea per rând suprascrie valoarea globală · Resturile sunt reutilizate integral</div>
+    <div class="btn-row">
+      <button class="btn-calc" onclick="calculeaza()">▶ Calculează</button>
+      <button class="btn-ghost" onclick="loadDemo()">Demo</button>
+      <button class="btn-ghost" onclick="resetAll()">Resetează</button>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results">
+    <div class="res-header-row">
+      <div class="res-title">Rezultate desfășurate</div>
+      <button class="btn-export" onclick="exportExcel()">⬇ Export Excel</button>
+    </div>
+    <div id="resultsList"></div>
+    <div id="summaryDiv"></div>
+  </div>
+
+</div>
+<script>
+// ── State ─────────────────────────────────────────────────────
+let lastResults = null;
+let rowId = 0;
+
+// ── Format ────────────────────────────────────────────────────
+function fmt(v) {
+  const z = parseInt(document.getElementById('zecimale').value) || 2;
+  return parseFloat(v.toFixed(z));
+}
+function fs(v) { return fmt(v).toString(); }
+
+// ── Pitch mode ────────────────────────────────────────────────
+let pitchMode = 'standard';
+function setPitchMode(mode) {
+  pitchMode = mode;
+  const inp  = document.getElementById('pasTaiere');
+  const note = document.getElementById('pitchNote');
+  document.getElementById('btnStandard').classList.toggle('active', mode === 'standard');
+  document.getElementById('btnCustom').classList.toggle('active', mode === 'custom');
+  if (mode === 'standard') {
+    inp.value = 5; inp.style.display = 'none';
+    note.textContent = 'Pas fix: 5 cm (50 mm)';
+  } else {
+    inp.style.display = 'block';
+    note.textContent = 'Introduceți pasul de tăiere în centimetri';
+    inp.focus();
+  }
+}
+function syncCustom() {
+  const v = parseFloat(document.getElementById('pasTaiere').value);
+  document.getElementById('pitchNote').textContent =
+    isNaN(v) || v <= 0 ? 'Valoare invalidă!' : `Pas: ${v} cm`;
+}
+function getPas() { return parseFloat(document.getElementById('pasTaiere').value) || 5; }
+function getPutereGlobala() {
+  const v = parseFloat(document.getElementById('putereWm').value);
+  return isNaN(v) || v <= 0 ? null : v;
+}
+
+// ── Row builder ───────────────────────────────────────────────
+function addRow(label = '', val = '', putere = '') {
+  const id = ++rowId;
+  const div = document.createElement('div');
+  div.className = 'nec-row';
+  div.dataset.id = id;
+  div.innerHTML = `
+    <input type="text"   placeholder="ex: Corp A1, nișă living…" value="${label}">
+    <input type="number" placeholder="cm" min="0.1" step="0.1" value="${val}" class="col-len">
+    <input type="number" placeholder="W/m" min="0" step="0.1" value="${putere}" class="col-power" title="Lasă gol pentru valoarea globală">
+    <button class="nec-del" onclick="delRow(${id})">✕</button>`;
+  document.getElementById('necList').appendChild(div);
+}
+function delRow(id) {
+  const el = document.querySelector(`.nec-row[data-id="${id}"]`);
+  if (el) el.remove();
+}
+function getRows() {
+  const putGlobala = getPutereGlobala();
+  return Array.from(document.querySelectorAll('.nec-row')).map(row => {
+    const ins = row.querySelectorAll('input');
+    const val    = parseFloat(ins[1].value);
+    const putRow = parseFloat(ins[2].value);
+    // Puterea efectivă: valoarea din rând dacă există, altfel globala
+    const putere = (!isNaN(putRow) && putRow > 0) ? putRow : putGlobala;
+    return { label: ins[0].value.trim(), val, putere };
+  }).filter(r => !isNaN(r.val) && r.val > 0);
+}
+
+// Init cu 3 rânduri goale
+addRow(); addRow(); addRow();
+
+// ── Math helpers ──────────────────────────────────────────────
+function rotunjesteSus(necesar, pas) {
+  if (necesar <= 0) return 0;
+  return parseFloat((Math.ceil(necesar / pas) * pas).toFixed(10));
+}
+function nrSeg(lungime, pas) { return Math.round(lungime / pas); }
+
+// Putere minimă: lungime reală (cm) → m × W/m
+function calcPutere(necesarReal_cm, putereWm) {
+  if (putereWm === null) return null;
+  return parseFloat(((necesarReal_cm / 100) * putereWm).toFixed(4));
+}
+
+// ══════════════════════════════════════════════════════════════
+// ALGORITHM
+// ══════════════════════════════════════════════════════════════
+function proceseaza(necesar, label, putere, pas, lungimeRola, resturi) {
+  const necesarReal = rotunjesteSus(necesar, pas);
+
+  // Cel mai mic rest suficient → surplus minim
+  let restFolosit = null, surplusMin = Infinity;
+  for (const r of resturi) {
+    if (r >= necesarReal - 1e-9) {
+      const surplus = r - necesarReal;
+      if (surplus < surplusMin) { surplusMin = surplus; restFolosit = r; }
+    }
+  }
+
+  const dinRest     = restFolosit !== null;
+  const sursa       = dinRest ? restFolosit : lungimeRola;
+  const restGenerat = Math.max(0, parseFloat((sursa - necesarReal).toFixed(10)));
+  const putereW     = calcPutere(necesarReal, putere);
+
+  return {
+    necesar, necesarReal, label, putere, putereW,
+    sursa:        dinRest ? 'rest' : 'rola',
+    restFolosit:  dinRest ? restFolosit : null,
+    rolaNecesara: dinRest ? 0 : lungimeRola,
+    restGenerat,
+    nrSegNecesar: nrSeg(necesarReal, pas),
+    nrSegRest:    nrSeg(restGenerat, pas),
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
+// MAIN CALCULATE
+// ══════════════════════════════════════════════════════════════
+function calculeaza() {
+  const pas         = getPas();
+  const lungimeRola = parseFloat(document.getElementById('lungimeRola').value);
+  if (isNaN(pas) || pas <= 0)                { alert('Pas de tăiere invalid!'); return; }
+  if (isNaN(lungimeRola) || lungimeRola <= 0) { alert('Lungime rolă invalidă!'); return; }
+
+  const intrari = getRows();
+  if (!intrari.length) { alert('Introduceți cel puțin un necesar!'); return; }
+
+  let resturi = [];
+  const rows  = [];
+  let totalRole = 0, totalMaterial = 0;
+
+  intrari.forEach((intr, idx) => {
+    const rez = proceseaza(intr.val, intr.label, intr.putere, pas, lungimeRola, resturi);
+
+    if (rez.sursa === 'rest') {
+      const i = resturi.findIndex(r => Math.abs(r - rez.restFolosit) < 1e-9);
+      if (i >= 0) resturi.splice(i, 1);
+    } else {
+      totalRole++;
+      totalMaterial += lungimeRola;
+    }
+    if (rez.restGenerat > 1e-9) resturi.push(rez.restGenerat);
+
+    rows.push({ idx: idx + 1, rez });
+  });
+
+  const totalUtilizat = rows.reduce((s, r) => s + r.rez.necesarReal, 0);
+  const totalPutere   = rows.reduce((s, r) => s + (r.rez.putereW || 0), 0);
+  const hasPutere     = rows.some(r => r.rez.putereW !== null);
+
+  lastResults = { rows, totalRole, totalMaterial, totalUtilizat, totalPutere, hasPutere, resturiFinale: [...resturi], pas, lungimeRola };
+  renderResults(lastResults);
+}
+
+// ══════════════════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════════════════
+function renderResults({ rows, totalRole, totalMaterial, totalUtilizat, totalPutere, hasPutere, resturiFinale, pas, lungimeRola }) {
+  const list = document.getElementById('resultsList');
+  list.innerHTML = '';
+
+  rows.forEach(({ idx, rez }, ri) => {
+    const card     = document.createElement('div');
+    card.className = 'rcard';
+    card.style.animationDelay = (ri * 0.05) + 's';
+
+    const exact    = rez.restGenerat < 1e-9;
+    const dinRest  = rez.sursa === 'rest';
+    const rotunjit = Math.abs(rez.necesarReal - rez.necesar) > 1e-9;
+
+    let badges = dinRest
+      ? '<span class="badge b-reuse">♻ din rest</span>'
+      : '<span class="badge b-new">◎ rolă nouă</span>';
+    if (exact) badges += '<span class="badge b-exact">Exact</span>';
+    else       badges += `<span class="badge b-rest">Rest ${fs(rez.restGenerat)} cm</span>`;
+    if (rez.putereW !== null)
+      badges += `<span class="badge b-power">⚡ ${fs(rez.putereW)} W</span>`;
+
+    const sursaLabel = dinRest
+      ? `din rest de ${fs(rez.restFolosit)} cm`
+      : `din rolă ${fs(lungimeRola)} cm`;
+
+    card.innerHTML = `
+      <div class="rcard-head">
+        <span class="rcard-idx">#${idx}</span>
+        ${rez.label ? `<span class="rcard-name">${rez.label}</span>` : ''}
+        <span class="rcard-dim">
+          ${rotunjit ? `${fs(rez.necesar)}<span class="arr">→</span>` : ''}
+          <strong>${fs(rez.necesarReal)}</strong> <small>cm</small>
+        </span>
+        ${badges}
+        <span class="rcard-src">${sursaLabel}</span>
+      </div>
+      <div class="rcard-body">
+        ${buildReelBar(rez, lungimeRola)}
+        ${buildFormula(rez, pas, rotunjit)}
+      </div>`;
+    list.appendChild(card);
+  });
+
+  renderSummary({ totalRole, totalMaterial, totalUtilizat, totalPutere, hasPutere, resturiFinale, lungimeRola, pas });
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+}
+
+function buildReelBar(rez, lungimeRola) {
+  const sursa    = rez.sursa === 'rest' ? rez.restFolosit : lungimeRola;
+  if (!sursa) return '';
+  const usedPct  = Math.min(100, rez.necesarReal / sursa * 100).toFixed(1);
+  const restPct  = Math.max(0, 100 - usedPct).toFixed(1);
+  const sursaLbl = rez.sursa === 'rest'
+    ? `Rest ${fs(rez.restFolosit)} cm`
+    : `Rolă ${fs(lungimeRola)} cm`;
+  return `
+    <div class="reel-wrap">
+      <div class="reel-label">${sursaLbl}</div>
+      <div class="reel-bar">
+        <div class="reel-used" style="width:${usedPct}%" title="${fs(rez.necesarReal)} cm utilizat">
+          ${parseFloat(usedPct) > 15 ? fs(rez.necesarReal) + ' cm' : ''}
+        </div>
+        ${rez.restGenerat > 1e-9 ? `
+        <div class="reel-rest" style="width:${restPct}%" title="Rest ${fs(rez.restGenerat)} cm → pool">
+          ${parseFloat(restPct) > 8 ? '✂ ' + fs(rez.restGenerat) + ' cm' : ''}
+        </div>` : ''}
+      </div>
+    </div>`;
+}
+
+function buildFormula(rez, pas, rotunjit) {
+  const linii = [];
+
+  if (rotunjit) {
+    linii.push(`
+      <div class="fb-row">
+        <span class="fb-label">Necesar introdus</span>
+        <span class="fb-val">${fs(rez.necesar)} cm</span>
+      </div>
+      <div class="fb-row">
+        <span class="fb-label">Rotunjit la pas ${fs(pas)} cm</span>
+        <span class="fb-val teal">${fs(rez.necesarReal)} cm
+          <span class="fb-note">(${rez.nrSegNecesar} × ${fs(pas)} cm)</span>
+        </span>
+      </div>`);
+  } else {
+    linii.push(`
+      <div class="fb-row">
+        <span class="fb-label">Lungime necesară</span>
+        <span class="fb-val teal">${fs(rez.necesarReal)} cm
+          <span class="fb-note">(${rez.nrSegNecesar} × ${fs(pas)} cm)</span>
+        </span>
+      </div>`);
+  }
+
+  linii.push(`
+    <div class="fb-row">
+      <span class="fb-label">Sursă</span>
+      <span class="fb-val ${rez.sursa === 'rest' ? 'blue' : 'teal'}">
+        ${rez.sursa === 'rest'
+          ? `♻ rest existent ${fs(rez.restFolosit)} cm`
+          : `◎ rolă nouă ${fs(rez.rolaNecesara)} cm`}
+      </span>
+    </div>`);
+
+  if (rez.restGenerat > 1e-9) {
+    linii.push(`
+      <div class="fb-row">
+        <span class="fb-label">Rest → pool</span>
+        <span class="fb-val gold">✂ ${fs(rez.restGenerat)} cm
+          <span class="fb-note">(${rez.nrSegRest} × ${fs(pas)} cm) → reutilizabil</span>
+        </span>
+      </div>`);
+  } else {
+    linii.push(`
+      <div class="fb-row">
+        <span class="fb-label">Rest generat</span>
+        <span class="fb-val green">0 cm · potrivire exactă 🎯</span>
+      </div>`);
+  }
+
+  // Power block
+  if (rez.putereW !== null) {
+    const lungM = fs(rez.necesarReal / 100);
+    linii.push(`
+      <div class="power-strip">
+        <div class="power-val">
+          <span class="pv-label">Lungime reală</span>
+          <span class="pv-num">${lungM}</span>
+          <span class="pv-unit">m</span>
+        </div>
+        <span class="power-sep">×</span>
+        <div class="power-val">
+          <span class="pv-label">Putere bandă</span>
+          <span class="pv-num">${fs(rez.putere)}</span>
+          <span class="pv-unit">W/m</span>
+        </div>
+        <span class="power-sep">=</span>
+        <div class="power-val">
+          <span class="pv-label">Putere minimă</span>
+          <span class="pv-num" style="font-size:22px;color:var(--purple)">${fs(rez.putereW)}</span>
+          <span class="pv-unit">W</span>
+        </div>
+      </div>`);
+  }
+
+  return `<div class="formula-block">${linii.join('')}</div>`;
+}
+
+function renderSummary({ totalRole, totalMaterial, totalUtilizat, totalPutere, hasPutere, resturiFinale, lungimeRola, pas }) {
+  const eficienta = totalMaterial > 0 ? (totalUtilizat / totalMaterial * 100).toFixed(1) : '—';
+  const restTotal = resturiFinale.reduce((s, r) => s + r, 0);
+
+  const restRows = resturiFinale.length
+    ? resturiFinale.map((r, i) =>
+        `<div class="sum-rest-row">${i + 1}. ${fs(r)} cm — ${nrSeg(r, pas)} × ${fs(pas)} cm</div>`
+      ).join('')
+    : '<div class="sum-rest-row" style="color:#6a6560">Niciunul — material utilizat 100% 🎯</div>';
+
+  const putereHtml = hasPutere ? `
+    <div class="sum-item purple">
+      <div class="sl">Putere totală min.</div>
+      <div class="sv">${fs(totalPutere)}</div>
+      <div class="su">W</div>
+    </div>` : '';
+
+  document.getElementById('summaryDiv').innerHTML = `
+    <div class="summary">
+      <div class="sum-title">Sumar total necesar</div>
+      <div class="sum-grid">
+        <div class="sum-item teal">
+          <div class="sl">Role necesare</div>
+          <div class="sv">${totalRole}</div>
+          <div class="su">× ${fs(lungimeRola)} cm</div>
+        </div>
+        <div class="sum-item teal">
+          <div class="sl">Material total</div>
+          <div class="sv">${fs(totalMaterial / 100)}</div>
+          <div class="su">metri liniari</div>
+        </div>
+        <div class="sum-item green">
+          <div class="sl">Total utilizat</div>
+          <div class="sv">${fs(totalUtilizat / 100)}</div>
+          <div class="su">metri liniari</div>
+        </div>
+        <div class="sum-item gold">
+          <div class="sl">Eficiență</div>
+          <div class="sv">${eficienta}</div>
+          <div class="su">% din material</div>
+        </div>
+        ${putereHtml}
+        ${restTotal > 1e-9 ? `
+        <div class="sum-item">
+          <div class="sl">Rest total pool</div>
+          <div class="sv" style="font-size:20px">${fs(restTotal / 100)}</div>
+          <div class="su">m neutilizați</div>
+        </div>` : ''}
+      </div>
+      <div class="sum-rests">
+        <div class="sum-rests-title">Resturi rămase în pool</div>
+        ${restRows}
+      </div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// EXCEL EXPORT
+// ══════════════════════════════════════════════════════════════
+function exportExcel() {
+  if (!lastResults) return;
+  const { rows, totalRole, totalMaterial, totalUtilizat, totalPutere, hasPutere, resturiFinale, pas, lungimeRola } = lastResults;
+  const prodName = document.getElementById('prodName').value || 'Bandă LED';
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Desfășurat
+  const headers = ['#', 'Denumire / Locație', 'Necesar introdus (cm)', 'Necesar real (cm)', 'Nr. segmente', 'Sursă', 'Rest generat (cm)', 'Nr. seg. rest'];
+  if (hasPutere) headers.push('Putere W/m', 'Putere minimă (W)');
+
+  const data1 = [headers];
+  rows.forEach(({ idx, rez }) => {
+    const row = [
+      idx,
+      rez.label || '—',
+      fmt(rez.necesar),
+      fmt(rez.necesarReal),
+      rez.nrSegNecesar,
+      rez.sursa === 'rest' ? `Rest existent ${fmt(rez.restFolosit)} cm` : `Rolă nouă ${fmt(lungimeRola)} cm`,
+      fmt(rez.restGenerat),
+      rez.nrSegRest
+    ];
+    if (hasPutere) {
+      row.push(rez.putere !== null ? fmt(rez.putere) : '—');
+      row.push(rez.putereW !== null ? fmt(rez.putereW) : '—');
+    }
+    data1.push(row);
+  });
+
+  // Total row
+  if (hasPutere) {
+    const totRow = ['', 'TOTAL', '', fmt(totalUtilizat), '', '', '', ''];
+    totRow.push('', fmt(totalPutere));
+    data1.push(totRow);
+  }
+
+  const ws1 = XLSX.utils.aoa_to_sheet(data1);
+  const colW = [5, 28, 20, 18, 14, 32, 18, 14];
+  if (hasPutere) colW.push(12, 16);
+  ws1['!cols'] = colW.map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, ws1, 'Desfășurat');
+
+  // Sheet 2: Sumar
+  const eficienta = totalMaterial > 0 ? (totalUtilizat / totalMaterial * 100).toFixed(1) + '%' : '—';
+  const data2 = [
+    [`SUMAR — ${prodName}`], [],
+    ['Pas de tăiere (cm)',  fmt(pas)],
+    ['Lungime rolă (cm)',   fmt(lungimeRola)], [],
+    ['Role necesare (buc)', totalRole],
+    ['Material total (m)',  fmt(totalMaterial / 100)],
+    ['Total utilizat (m)',  fmt(totalUtilizat / 100)],
+    ['Eficiență',           eficienta],
+  ];
+  if (hasPutere) {
+    data2.push(['Putere totală minimă (W)', fmt(totalPutere)]);
+  }
+  data2.push(
+    [],
+    ['Resturi rămase în pool (cm)'],
+    [resturiFinale.length ? resturiFinale.map(r => `${fmt(r)} cm`).join(', ') : 'niciunul']
+  );
+  const ws2 = XLSX.utils.aoa_to_sheet(data2);
+  ws2['!cols'] = [{ wch: 26 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Sumar');
+
+  XLSX.writeFile(wb, `banda_led_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+// ══════════════════════════════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════════════════════════════
+function loadDemo() {
+  document.getElementById('necList').innerHTML = '';
+  rowId = 0;
+  document.getElementById('putereWm').value = '14.4';
+  [
+    ['Corp iluminat A1',  240, ''],
+    ['Corp iluminat A2',  180, ''],
+    ['Nișă living',       320, '19.2'],
+    ['Baie oglindă',       95, ''],
+    ['Coridor',           410, ''],
+    ['Dulap dormitor',    155, '9.6'],
+  ].forEach(([label, val, put]) => addRow(label, val, put));
+  setPitchMode('standard');
+}
+
+function resetAll() {
+  document.getElementById('necList').innerHTML = '';
+  rowId = 0;
+  addRow(); addRow(); addRow();
+  document.getElementById('putereWm').value = '';
+  document.getElementById('results').style.display = 'none';
+  lastResults = null;
+}
+</script>
+</body>
+</html>
