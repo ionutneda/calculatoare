@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculator Segmente</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:#f4f1ec; --surface:#ffffff; --surface2:#ede9e1; --border:#ddd8ce; --border2:#c5bfb4;
+  --ink:#1c1a17; --ink2:#5c574f; --ink3:#9c978f;
+  --red:#c0392b; --blue:#1a56a0; --gold:#a0620a; --green:#1a6640; --purple:#6b3fa0;
+  --mono:'DM Mono',monospace; --sans:'Syne',sans-serif; --r:3px;
+}
+body { background:var(--bg); color:var(--ink); font-family:var(--sans); min-height:100vh; padding:28px 16px 80px; }
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:repeating-linear-gradient(transparent,transparent 31px,rgba(160,150,130,.12) 31px,rgba(160,150,130,.12) 32px);
+}
+.wrap { max-width:960px; margin:0 auto; position:relative; z-index:1; }
+
+/* HEADER */
+.hdr { margin-bottom:32px; }
+.hdr-tag { font-family:var(--mono); font-size:10px; color:var(--red); letter-spacing:3px; text-transform:uppercase; margin-bottom:6px; }
+.hdr h1 { font-size:38px; font-weight:800; line-height:1; letter-spacing:-1px; }
+.hdr h1 em { color:var(--red); font-style:normal; }
+.hdr-sub { font-family:var(--mono); font-size:11px; color:var(--ink3); margin-top:7px; font-weight:300; }
+
+/* PANEL */
+.panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:20px 22px; margin-bottom:12px; }
+.ptitle {
+  font-family:var(--mono); font-size:10px; font-weight:500; color:var(--ink3);
+  letter-spacing:3px; text-transform:uppercase; margin-bottom:14px;
+  padding-bottom:9px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:7px;
+}
+.ptitle::before { content:''; width:5px; height:5px; border-radius:50%; background:var(--red); flex-shrink:0; }
+
+/* TYPE SELECTOR */
+.type-grid { display:flex; gap:10px; flex-wrap:wrap; }
+.tbtn {
+  flex:1; min-width:140px; border:1.5px solid var(--border2); border-radius:var(--r);
+  background:var(--bg); padding:14px 16px; cursor:pointer; transition:all .15s; text-align:left;
+}
+.tbtn:hover { border-color:var(--red); }
+.tbtn.active { border-color:var(--red); background:#fff; box-shadow:0 0 0 3px rgba(192,57,43,.09); }
+.tbtn .tl { font-family:var(--mono); font-size:9px; color:var(--ink3); letter-spacing:2px; text-transform:uppercase; margin-bottom:5px; }
+.tbtn .ts { font-size:17px; font-weight:700; color:var(--ink); line-height:1; }
+.tbtn.active .ts { color:var(--red); }
+.tbtn .td { font-family:var(--mono); font-size:10px; color:var(--ink3); margin-top:4px; font-weight:300; }
+
+/* SETTINGS */
+.settings-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.field label { display:block; font-family:var(--mono); font-size:10px; color:var(--ink3); letter-spacing:2px; text-transform:uppercase; margin-bottom:5px; }
+input[type="number"],input[type="text"] {
+  width:100%; background:var(--bg); border:1px solid var(--border2); color:var(--ink);
+  font-family:var(--mono); font-size:14px; padding:8px 11px; border-radius:var(--r); outline:none; transition:border-color .15s;
+}
+input:focus { border-color:var(--red); background:#fff; }
+textarea {
+  width:100%; background:var(--bg); border:1px solid var(--border2); color:var(--ink);
+  font-family:var(--mono); font-size:15px; letter-spacing:.5px; padding:11px;
+  border-radius:var(--r); resize:vertical; min-height:76px; outline:none; line-height:1.7; transition:border-color .15s;
+}
+textarea:focus { border-color:var(--red); background:#fff; }
+textarea::placeholder { color:var(--ink3); }
+.hint { font-family:var(--mono); font-size:10px; color:var(--ink3); margin-top:5px; letter-spacing:.5px; }
+
+/* BUTTONS */
+.btn-row { display:flex; gap:9px; margin-top:14px; flex-wrap:wrap; }
+button {
+  font-family:var(--sans); font-size:12px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+  padding:10px 20px; border:none; border-radius:var(--r); cursor:pointer; transition:all .15s;
+}
+.btn-calc { background:var(--red); color:#fff; }
+.btn-calc:hover { background:#a02a1e; transform:translateY(-1px); box-shadow:0 4px 14px rgba(192,57,43,.25); }
+.btn-export { background:var(--green); color:#fff; }
+.btn-export:hover { background:#124d30; transform:translateY(-1px); }
+.btn-ghost { background:transparent; color:var(--ink2); border:1.5px solid var(--border2); font-family:var(--mono); font-weight:400; }
+.btn-ghost:hover { border-color:var(--ink2); }
+.btn-add { background:var(--blue); color:#fff; padding:8px 16px; font-size:11px; }
+.btn-add:hover { background:#143f7a; }
+.btn-sm { padding:6px 12px; font-size:10px; }
+
+/* ── CIRCUIT BUILDER ── */
+.circuit-tabs { display:flex; gap:0; margin-bottom:16px; border:1px solid var(--border2); border-radius:var(--r); overflow:hidden; }
+.ctab {
+  flex:1; padding:9px 12px; font-family:var(--mono); font-size:11px; font-weight:500;
+  letter-spacing:1px; text-transform:uppercase; background:var(--bg); color:var(--ink3);
+  border:none; cursor:pointer; transition:all .15s; border-right:1px solid var(--border2);
+}
+.ctab:last-child { border-right:none; }
+.ctab:hover { background:var(--surface2); color:var(--ink); }
+.ctab.active { background:var(--surface); color:var(--red); font-weight:700; }
+
+/* Circuit list */
+#circuitList { display:flex; flex-direction:column; gap:8px; }
+.circuit-item {
+  border:1px solid var(--border); border-radius:var(--r); background:var(--bg);
+  padding:12px 14px; display:flex; align-items:flex-start; gap:10px; flex-wrap:wrap;
+}
+.circuit-item.closed { border-left:3px solid var(--purple); }
+.circuit-item.open   { border-left:3px solid var(--blue); }
+.ci-idx { font-family:var(--mono); font-size:10px; color:var(--ink3); padding-top:2px; min-width:22px; }
+.ci-body { flex:1; min-width:200px; }
+.ci-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+.ci-name { font-family:var(--mono); font-size:13px; font-weight:500; color:var(--ink); }
+.ci-type { font-family:var(--mono); font-size:9px; padding:2px 7px; border-radius:2px; text-transform:uppercase; letter-spacing:1px; }
+.ci-t-open   { background:rgba(26,86,160,.1);  color:var(--blue);   border:1px solid rgba(26,86,160,.2); }
+.ci-t-closed { background:rgba(107,63,160,.1); color:var(--purple); border:1px solid rgba(107,63,160,.2); }
+.ci-segments { display:flex; align-items:center; gap:5px; flex-wrap:wrap; font-family:var(--mono); font-size:12px; }
+.ci-seg-val {
+  background:var(--surface); border:1px solid var(--border2); border-radius:2px;
+  padding:3px 8px; color:var(--ink); display:flex; align-items:center; gap:4px;
+}
+.ci-seg-val span { color:var(--ink3); font-size:10px; }
+.ci-corner { color:var(--purple); font-size:14px; }
+.ci-close-icon { color:var(--purple); font-size:10px; opacity:.7; }
+.ci-stats { font-family:var(--mono); font-size:10px; color:var(--ink3); margin-top:6px; display:flex; gap:14px; flex-wrap:wrap; }
+.ci-stats b { color:var(--ink2); }
+.ci-actions { display:flex; gap:6px; align-items:flex-start; padding-top:2px; }
+.ci-del { background:transparent; border:1px solid var(--border2); color:var(--ink3); padding:5px 9px; font-size:11px; border-radius:2px; cursor:pointer; transition:all .15s; }
+.ci-del:hover { border-color:var(--red); color:var(--red); }
+
+/* Add circuit form */
+.add-circuit-form {
+  border:1.5px dashed var(--border2); border-radius:var(--r); padding:16px 18px;
+  background:var(--bg); margin-top:10px; display:none;
+}
+.add-circuit-form.open { display:block; }
+.acf-row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; }
+.acf-field { display:flex; flex-direction:column; gap:4px; }
+.acf-field label { font-family:var(--mono); font-size:9px; color:var(--ink3); letter-spacing:2px; text-transform:uppercase; }
+.acf-field input { width:120px; }
+.acf-field select {
+  background:var(--bg); border:1px solid var(--border2); color:var(--ink);
+  font-family:var(--mono); font-size:13px; padding:8px 10px; border-radius:var(--r);
+  outline:none; cursor:pointer; width:180px;
+}
+.acf-field select:focus { border-color:var(--red); background:#fff; }
+/* preset shapes */
+.shape-grid { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+.shape-btn {
+  border:1px solid var(--border2); border-radius:var(--r); background:var(--surface);
+  padding:8px 12px; cursor:pointer; transition:all .15s; text-align:center; min-width:80px;
+}
+.shape-btn:hover { border-color:var(--blue); background:#f0f5ff; }
+.shape-btn .sb-icon { font-size:20px; line-height:1; margin-bottom:3px; }
+.shape-btn .sb-name { font-family:var(--mono); font-size:9px; color:var(--ink3); letter-spacing:1px; text-transform:uppercase; }
+/* latura inputs */
+.laturi-row { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; }
+.latura-field { display:flex; flex-direction:column; gap:3px; }
+.latura-field label { font-family:var(--mono); font-size:9px; color:var(--ink3); letter-spacing:1px; text-transform:uppercase; }
+.latura-field input { width:90px; }
+.latura-field.corner-after label::after { content:' ↱'; color:var(--purple); }
+.latura-sep { font-family:var(--mono); font-size:16px; color:var(--purple); padding-bottom:8px; align-self:flex-end; }
+
+/* RESULTS SECTION */
+#results { display:none; margin-top:8px; }
+.res-header-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+.res-title { font-family:var(--mono); font-size:10px; color:var(--ink3); letter-spacing:3px; text-transform:uppercase; }
+
+/* RESULT CARD */
+.rcard {
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--r);
+  margin-bottom:10px; overflow:hidden; animation:fadeUp .22s ease both;
+}
+@keyframes fadeUp { from{opacity:0;transform:translateY(7px)} to{opacity:1;transform:translateY(0)} }
+.rcard-head {
+  display:flex; align-items:center; flex-wrap:wrap; gap:10px;
+  padding:11px 16px; border-bottom:1px solid var(--border); background:var(--surface2);
+}
+.rcard-idx { font-family:var(--mono); font-size:10px; color:var(--ink3); min-width:24px; }
+.rcard-need { font-family:var(--mono); font-size:20px; font-weight:500; color:var(--ink); }
+.rcard-need small { font-size:12px; color:var(--ink3); font-weight:300; }
+/* circuit sub-latura header */
+.rcard-latura-head {
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:7px 16px; border-bottom:1px solid var(--border);
+  background:#faf9f7;
+}
+.rcard-latura-label { font-family:var(--mono); font-size:10px; color:var(--ink3); }
+.rcard-latura-val { font-family:var(--mono); font-size:13px; font-weight:500; color:var(--ink2); }
+.badge {
+  font-family:var(--mono); font-size:9px; font-weight:500; letter-spacing:1px;
+  text-transform:uppercase; padding:3px 8px; border-radius:2px;
+}
+.b-exact  { background:rgba(26,102,64,.1);  color:var(--green);  border:1px solid rgba(26,102,64,.2); }
+.b-rest   { background:rgba(160,98,10,.1);  color:var(--gold);   border:1px solid rgba(160,98,10,.2); }
+.b-reuse  { background:rgba(26,86,160,.1);  color:var(--blue);   border:1px solid rgba(26,86,160,.2); }
+.b-conn   { background:rgba(192,57,43,.08); color:var(--red);    border:1px solid rgba(192,57,43,.15); }
+.b-corner { background:rgba(107,63,160,.1); color:var(--purple); border:1px solid rgba(107,63,160,.2); }
+.b-circuit{ background:rgba(107,63,160,.06);color:var(--purple); border:1px solid rgba(107,63,160,.15); font-size:10px; }
+.rcard-resturi-avail { margin-left:auto; font-family:var(--mono); font-size:10px; color:var(--ink3); }
+
+/* FORMULA VISUALIZATION */
+.rcard-body { padding:14px 16px; }
+.formula-line {
+  display:flex; align-items:center; flex-wrap:wrap; gap:6px;
+  font-family:var(--mono); font-size:13px; margin-bottom:12px;
+}
+.formula-eq { color:var(--ink3); font-size:11px; margin:0 2px; }
+.seg-block {
+  display:inline-flex; flex-direction:column; align-items:center;
+  border-radius:2px; padding:5px 10px; line-height:1.2; min-width:52px; text-align:center;
+}
+.seg-block .sb-top { font-size:13px; font-weight:500; }
+.seg-block .sb-bot { font-size:9px; letter-spacing:1px; text-transform:uppercase; margin-top:2px; opacity:.8; }
+.sb-300-new  { background:rgba(26,86,160,.12);  color:var(--blue);   border:1px solid rgba(26,86,160,.25); }
+.sb-200-new  { background:rgba(160,98,10,.12);  color:var(--gold);   border:1px solid rgba(160,98,10,.25); }
+.sb-100-new  { background:rgba(100,60,150,.12); color:#6b46a0;       border:1px solid rgba(100,60,150,.25); }
+.sb-300-part { background:rgba(26,86,160,.06);  color:var(--blue);   border:1px dashed rgba(26,86,160,.35); }
+.sb-200-part { background:rgba(160,98,10,.06);  color:var(--gold);   border:1px dashed rgba(160,98,10,.35); }
+.sb-100-part { background:rgba(100,60,150,.06); color:#6b46a0;       border:1px dashed rgba(100,60,150,.35); }
+.sb-rest-used { background:rgba(26,86,160,.08); color:var(--blue);   border:1px solid rgba(26,86,160,.2); }
+.sb-rest-part { background:rgba(26,86,160,.05); color:var(--blue);   border:1px dashed rgba(26,86,160,.3); }
+.conn-dot {
+  width:18px; height:18px; border-radius:50%; background:var(--red); color:#fff;
+  font-family:var(--mono); font-size:9px; font-weight:500;
+  display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.corner-dot {
+  width:20px; height:20px; border-radius:3px; background:var(--purple); color:#fff;
+  font-family:var(--mono); font-size:9px; font-weight:500;
+  display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+
+/* VISUAL BAR */
+.vbar { display:flex; height:16px; border-radius:2px; overflow:hidden; border:1px solid var(--border2); margin-bottom:12px; }
+.vbar-seg { height:100%; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:8px; font-weight:500; min-width:2px; transition:width .4s ease; }
+.vb-300n { background:#1a56a0; color:#cde; }
+.vb-200n { background:#a0620a; color:#fed; }
+.vb-100n { background:#6b46a0; color:#e8d8ff; }
+.vb-300p { background:repeating-linear-gradient(45deg,#1a56a040,#1a56a040 3px,#1a56a015 3px,#1a56a015 6px); color:var(--blue); }
+.vb-200p { background:repeating-linear-gradient(45deg,#a0620a40,#a0620a40 3px,#a0620a15 3px,#a0620a15 6px); color:var(--gold); }
+.vb-100p { background:repeating-linear-gradient(45deg,#6b46a040,#6b46a040 3px,#6b46a015 3px,#6b46a015 6px); color:#6b46a0; }
+.vb-rused { background:#1a56a055; color:var(--blue); }
+.vb-rpart { background:repeating-linear-gradient(45deg,#1a56a030,#1a56a030 3px,#1a56a010 3px,#1a56a010 6px); }
+
+/* INFO ROW */
+.info-row { display:flex; gap:16px; flex-wrap:wrap; margin-top:4px; }
+.info-item { display:flex; flex-direction:column; gap:2px; }
+.info-item .il { font-family:var(--mono); font-size:9px; color:var(--ink3); letter-spacing:1.5px; text-transform:uppercase; }
+.info-item .iv { font-family:var(--mono); font-size:13px; color:var(--ink); }
+.info-item .iv.accent { color:var(--red); font-weight:500; }
+.info-item .iv.blue   { color:var(--blue); }
+.info-item .iv.gold   { color:var(--gold); }
+.info-item .iv.green  { color:var(--green); }
+.info-item .iv.purple { color:var(--purple); }
+
+/* CIRCUIT SUMMARY BLOCK */
+.circuit-summary-block {
+  border:1px solid rgba(107,63,160,.25); border-radius:var(--r);
+  background:rgba(107,63,160,.04); padding:10px 14px; margin-top:8px;
+  font-family:var(--mono); font-size:11px; color:var(--ink2);
+}
+.circuit-summary-block .csb-title { font-size:9px; color:var(--purple); letter-spacing:2px; text-transform:uppercase; margin-bottom:6px; }
+.circuit-summary-block .csb-row { display:flex; gap:20px; flex-wrap:wrap; }
+.circuit-summary-block .csb-item b { color:var(--ink); }
+
+/* SUMMARY */
+.summary { background:var(--ink); color:#f4f1ec; border-radius:var(--r); padding:22px 24px; margin-top:6px; }
+.sum-title { font-family:var(--mono); font-size:10px; letter-spacing:3px; text-transform:uppercase; color:#9a9590; margin-bottom:16px; }
+.sum-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:16px; margin-bottom:18px; }
+.sum-item .sl { font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:#6a6560; margin-bottom:3px; }
+.sum-item .sv { font-family:var(--mono); font-size:26px; font-weight:500; color:#f4f1ec; line-height:1; }
+.sum-item .su { font-family:var(--mono); font-size:10px; color:#9a9590; margin-top:2px; }
+.sum-item.accent .sv { color:#e8866e; }
+.sum-item.blue .sv   { color:#7ab3e8; }
+.sum-item.gold .sv   { color:#e8b866; }
+.sum-item.purple .sv { color:#c4a3e8; }
+.sum-restlist { border-top:1px solid #333; padding-top:14px; }
+.sum-restlist .sl { font-family:var(--mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:#6a6560; margin-bottom:8px; }
+.rest-chips { display:flex; gap:7px; flex-wrap:wrap; }
+.rest-chip { font-family:var(--mono); font-size:12px; padding:4px 10px; border-radius:2px; background:rgba(26,86,160,.2); color:#7ab3e8; border:1px solid rgba(26,86,160,.3); }
+
+/* LEGEND */
+.legend { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+.leg-item { display:flex; align-items:center; gap:5px; font-family:var(--mono); font-size:10px; color:var(--ink3); }
+.leg-swatch { width:14px; height:14px; border-radius:2px; flex-shrink:0; }
+.leg-solid-300 { background:#1a56a0; }
+.leg-solid-200 { background:#a0620a; }
+.leg-solid-100 { background:#6b46a0; }
+.leg-dashed { background:repeating-linear-gradient(45deg,#a0620a40,#a0620a40 3px,transparent 3px,transparent 6px); border:1px dashed #a0620a; }
+.leg-corner { background:var(--purple); border-radius:3px; }
+
+/* input mode tabs */
+.mode-tabs { display:flex; gap:0; margin-bottom:16px; border:1px solid var(--border2); border-radius:var(--r); overflow:hidden; width:fit-content; }
+.mtab {
+  padding:9px 18px; font-family:var(--mono); font-size:11px; font-weight:500;
+  letter-spacing:1px; text-transform:uppercase; background:var(--bg); color:var(--ink3);
+  border:none; cursor:pointer; transition:all .15s; border-right:1px solid var(--border2);
+}
+.mtab:last-child { border-right:none; }
+.mtab:hover { background:var(--surface2); color:var(--ink); }
+.mtab.active { background:var(--surface); color:var(--red); font-weight:700; }
+
+.mode-panel { display:none; }
+.mode-panel.active { display:block; }
+
+@media(max-width:600px) {
+  .settings-row { grid-template-columns:1fr; }
+  .hdr h1 { font-size:28px; }
+  .sum-grid { grid-template-columns:1fr 1fr; }
+  .acf-field input { width:90px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hdr">
+    <div class="hdr-tag">Optimizare tăieri · v3.0</div>
+    <h1>Calculator<br><em>Segmente</em></h1>
+    <div class="hdr-sub">Tăieri parțiale · Conectori liniari &amp; de colț · Circuite compuse · Reutilizare resturi · Export Excel</div>
+  </header>
+
+  <!-- SEGMENT TYPE -->
+  <div class="panel">
+    <div class="ptitle">Tip produs — segmente disponibile</div>
+    <div class="type-grid">
+      <button class="tbtn active" data-type="123" onclick="setType(this,'123')">
+        <div class="tl">Tip A</div><div class="ts">1m + 2m + 3m</div><div class="td">100 + 200 + 300 cm</div>
+      </button>
+      <button class="tbtn" data-type="23" onclick="setType(this,'23')">
+        <div class="tl">Tip B</div><div class="ts">2m + 3m</div><div class="td">200 + 300 cm</div>
+      </button>
+      <button class="tbtn" data-type="2" onclick="setType(this,'2')">
+        <div class="tl">Tip C</div><div class="ts">doar 2m</div><div class="td">200 cm</div>
+      </button>
+      <button class="tbtn" data-type="3" onclick="setType(this,'3')">
+        <div class="tl">Tip D</div><div class="ts">doar 3m</div><div class="td">300 cm</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="panel">
+    <div class="ptitle">Setări</div>
+    <div class="settings-row">
+      <div class="field">
+        <label>Rest minim reutilizabil (cm)</label>
+        <input type="number" id="restMin" value="30" min="0" max="200" step="5">
+      </div>
+      <div class="field">
+        <label>Denumire produs / lot (opțional)</label>
+        <input type="text" id="prodName" placeholder="ex: Profil aluminiu 40×40">
+      </div>
+    </div>
+  </div>
+
+  <!-- INPUT MODE TABS -->
+  <div class="panel">
+    <div class="ptitle">Mod introducere necesare</div>
+    <div class="mode-tabs">
+      <button class="mtab active" onclick="setMode(this,'simple')">Linii simple</button>
+      <button class="mtab" onclick="setMode(this,'circuit')">Circuite compuse</button>
+    </div>
+
+    <!-- SIMPLE MODE -->
+    <div class="mode-panel active" id="modeSimple">
+      <textarea id="inputNec" placeholder="550, 400, 320, 210, 480&#10;sau câte unul pe linie"></textarea>
+      <div class="hint">Valori în centimetri · Separați prin virgulă sau Enter</div>
+    </div>
+
+    <!-- CIRCUIT MODE -->
+    <div class="mode-panel" id="modeCircuit">
+      <div id="circuitList">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--ink3);padding:8px 0;">Niciun circuit adăugat. Folosiți butoanele de mai jos.</div>
+      </div>
+
+      <!-- Add form -->
+      <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn-add" onclick="toggleAddForm()">+ Adaugă circuit</button>
+        <button class="btn-ghost btn-sm" onclick="loadDemoCircuits()">Demo circuite</button>
+      </div>
+
+      <div class="add-circuit-form" id="addCircuitForm">
+        <div class="ptitle" style="margin-bottom:12px;">Configurare circuit nou</div>
+
+        <!-- Preset shapes -->
+        <div style="font-family:var(--mono);font-size:9px;color:var(--ink3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Forme predefinite</div>
+        <div class="shape-grid">
+          <button class="shape-btn" onclick="applyPreset('linie')">
+            <div class="sb-icon">━</div><div class="sb-name">Linie</div>
+          </button>
+          <button class="shape-btn" onclick="applyPreset('L')">
+            <div class="sb-icon">┘</div><div class="sb-name">L</div>
+          </button>
+          <button class="shape-btn" onclick="applyPreset('U')">
+            <div class="sb-icon">⊓</div><div class="sb-name">U / Z</div>
+          </button>
+          <button class="shape-btn" onclick="applyPreset('rect')">
+            <div class="sb-icon">▭</div><div class="sb-name">Dreptunghi</div>
+          </button>
+          <button class="shape-btn" onclick="applyPreset('custom')">
+            <div class="sb-icon">✦</div><div class="sb-name">Custom</div>
+          </button>
+        </div>
+
+        <div class="acf-row" style="margin-bottom:10px;">
+          <div class="acf-field">
+            <label>Nume circuit (opțional)</label>
+            <input type="text" id="acfName" placeholder="ex: Circuit A" style="width:180px;">
+          </div>
+          <div class="acf-field">
+            <label>Tip</label>
+            <select id="acfTip">
+              <option value="open">Deschis (capete libere)</option>
+              <option value="closed">Închis (se conectează la start)</option>
+            </select>
+          </div>
+          <div class="acf-field">
+            <label>Nr. laturi</label>
+            <input type="number" id="acfNrLaturi" value="1" min="1" max="12" style="width:80px;" oninput="updateLaturiInputs()">
+          </div>
+        </div>
+
+        <div id="laturiInputs" class="laturi-row"></div>
+
+        <div class="btn-row" style="margin-top:14px;">
+          <button class="btn-add" onclick="addCircuit()">✓ Adaugă</button>
+          <button class="btn-ghost btn-sm" onclick="toggleAddForm()">Anulează</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-calc" onclick="calculeaza()">▶ Calculează</button>
+      <button class="btn-ghost" onclick="loadDemo()">Demo simplu</button>
+      <button class="btn-ghost" onclick="resetAll()">Resetează</button>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results">
+    <div class="res-header-row">
+      <div class="res-title">Rezultate desfășurate</div>
+      <button class="btn-export" onclick="exportExcel()">⬇ Export Excel</button>
+    </div>
+    <div class="legend">
+      <div class="leg-item"><div class="leg-swatch leg-solid-300"></div>3m întreg</div>
+      <div class="leg-item"><div class="leg-swatch leg-solid-200"></div>2m întreg</div>
+      <div class="leg-item"><div class="leg-swatch leg-solid-100"></div>1m întreg</div>
+      <div class="leg-item"><div class="leg-swatch leg-dashed"></div>Tăiat parțial</div>
+      <div class="leg-item"><div class="leg-swatch leg-corner"></div>Conector colț</div>
+    </div>
+    <div id="resultsList"></div>
+    <div id="summaryDiv"></div>
+  </div>
+
+</div>
+<script>
+// ══════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════
+let currentType = '123';
+let currentMode = 'simple';
+let lastResults = null;
+let circuits = []; // [{id, name, tip:'open'|'closed', laturi:[cm,...]}]
+let nextCircuitId = 1;
+
+function setType(el, type) {
+  document.querySelectorAll('.tbtn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  currentType = type;
+}
+function setMode(el, mode) {
+  document.querySelectorAll('.mtab').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('mode' + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.add('active');
+  currentMode = mode;
+}
+function getSegmente() {
+  if (currentType === '123') return [300, 200, 100];
+  if (currentType === '23')  return [300, 200];
+  if (currentType === '3')   return [300];
+  return [200];
+}
+
+// ══════════════════════════════════════════════════════════════
+// CIRCUIT BUILDER UI
+// ══════════════════════════════════════════════════════════════
+function toggleAddForm() {
+  const f = document.getElementById('addCircuitForm');
+  const open = f.classList.toggle('open');
+  if (open) { updateLaturiInputs(); }
+}
+
+function applyPreset(preset) {
+  const nrEl = document.getElementById('acfNrLaturi');
+  const tipEl = document.getElementById('acfTip');
+  if (preset === 'linie')  { nrEl.value = 1; tipEl.value = 'open'; }
+  if (preset === 'L')      { nrEl.value = 2; tipEl.value = 'open'; }
+  if (preset === 'U')      { nrEl.value = 3; tipEl.value = 'open'; }
+  if (preset === 'rect')   { nrEl.value = 4; tipEl.value = 'closed'; }
+  if (preset === 'custom') { nrEl.value = 4; tipEl.value = 'open'; }
+  updateLaturiInputs();
+}
+
+function updateLaturiInputs() {
+  const n = parseInt(document.getElementById('acfNrLaturi').value) || 1;
+  const tip = document.getElementById('acfTip').value;
+  const container = document.getElementById('laturiInputs');
+
+  // shape hints
+  const hints = { 1:'latura', 2:'L1,L2', 3:'U/Z: L1,L2,L3', 4:'L1-L4' };
+  let html = '';
+  for (let i = 0; i < n; i++) {
+    const isLast = i === n - 1;
+    const showCorner = !isLast || tip === 'closed';
+    html += `<div class="latura-field">
+      <label>Latura ${i+1} (cm)</label>
+      <input type="number" class="acf-latura" min="1" placeholder="cm" style="width:90px;">
+    </div>`;
+    if (showCorner) {
+      html += `<div class="latura-sep" title="Colț">↱</div>`;
+    }
+  }
+  container.innerHTML = html;
+}
+
+function addCircuit() {
+  const name  = document.getElementById('acfName').value.trim();
+  const tip   = document.getElementById('acfTip').value;
+  const inputs = document.querySelectorAll('.acf-latura');
+  const laturi = Array.from(inputs).map(i => parseInt(i.value)).filter(v => !isNaN(v) && v > 0);
+
+  if (!laturi.length || laturi.length !== inputs.length) {
+    alert('Completați toate laturile cu valori pozitive!'); return;
+  }
+
+  const circuit = {
+    id: nextCircuitId++,
+    name: name || `Circuit ${nextCircuitId - 1}`,
+    tip,
+    laturi
+  };
+  circuits.push(circuit);
+
+  // reset form
+  document.getElementById('acfName').value = '';
+  document.getElementById('acfNrLaturi').value = 1;
+  document.getElementById('addCircuitForm').classList.remove('open');
+  renderCircuitList();
+}
+
+function deleteCircuit(id) {
+  circuits = circuits.filter(c => c.id !== id);
+  renderCircuitList();
+}
+
+function circuitCorners(c) {
+  // open: corners = laturi - 1; closed: corners = laturi
+  return c.tip === 'closed' ? c.laturi.length : c.laturi.length - 1;
+}
+
+function renderCircuitList() {
+  const el = document.getElementById('circuitList');
+  if (!circuits.length) {
+    el.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--ink3);padding:8px 0;">Niciun circuit adăugat.</div>';
+    return;
+  }
+  el.innerHTML = circuits.map((c, i) => {
+    const corners = circuitCorners(c);
+    const totalCm = c.laturi.reduce((s, v) => s + v, 0);
+    // build segments visual
+    let segsHtml = c.laturi.map((l, li) => {
+      const isLast = li === c.laturi.length - 1;
+      const cornerAfter = !isLast || c.tip === 'closed';
+      return `<span class="ci-seg-val">${l}<span>cm</span></span>${cornerAfter ? '<span class="ci-corner">↱</span>' : ''}`;
+    }).join('');
+    if (c.tip === 'closed') segsHtml += '<span class="ci-close-icon">⟲ închis</span>';
+
+    return `<div class="circuit-item ${c.tip}" data-id="${c.id}">
+      <span class="ci-idx">#${i+1}</span>
+      <div class="ci-body">
+        <div class="ci-head">
+          <span class="ci-name">${c.name}</span>
+          <span class="ci-type ci-t-${c.tip}">${c.tip === 'closed' ? 'Închis' : 'Deschis'}</span>
+        </div>
+        <div class="ci-segments">${segsHtml}</div>
+        <div class="ci-stats">
+          <span>Total: <b>${totalCm} cm</b></span>
+          <span>Laturi: <b>${c.laturi.length}</b></span>
+          <span>Colțuri: <b>${corners}</b></span>
+        </div>
+      </div>
+      <div class="ci-actions">
+        <button class="ci-del" onclick="deleteCircuit(${c.id})">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function loadDemoCircuits() {
+  circuits = [
+    { id: nextCircuitId++, name: 'Linie dreaptă', tip: 'open',   laturi: [150] },
+    { id: nextCircuitId++, name: 'Circuit L',     tip: 'open',   laturi: [150, 250] },
+    { id: nextCircuitId++, name: 'Dreptunghi',    tip: 'closed', laturi: [240, 350, 240, 350] },
+    { id: nextCircuitId++, name: 'Paralelogram',  tip: 'closed', laturi: [250, 200, 300, 200] },
+  ];
+  renderCircuitList();
+}
+
+// ══════════════════════════════════════════════════════════════
+// ALGORITHM
+// Reguli resturi:
+//   - max 1 rest per latură
+//   - restul se folosește doar dacă acoperă SINGUR ce rămâne
+//     după segmentele noi (nu se combină resturi între ele)
+// ══════════════════════════════════════════════════════════════
+function combinatiiOptime(necesar, resturiDisp) {
+  const segs = getSegmente();
+  const restSort = [...resturiDisp].sort((a, b) => b - a);
+  let best = null, bestScore = null;
+  const maxes = segs.map(s => Math.floor(necesar / s) + 1);
+
+  function iterate(idx, counts, totalNou) {
+    if (idx === segs.length) {
+      const ramas = necesar - totalNou;
+
+      // Cazul 1: segmentele noi acoperă tot (fără rest)
+      if (ramas <= 0) {
+        const restNou = -ramas;
+        const score = [counts.reduce((s,x)=>s+x,0), restNou];
+        if (!bestScore || scorBetter(score, bestScore)) {
+          bestScore = score;
+          best = buildResult(segs, counts, [], restNou, necesar);
+        }
+        return;
+      }
+
+      // Cazul 2: mai rămâne ceva — încearcă UN SINGUR rest care acoperă 'ramas'
+      // Căutăm cel mai mic rest care e >= ramas (surplus minim din rest)
+      for (let i = restSort.length - 1; i >= 0; i--) {
+        const r = restSort[i];
+        if (r >= ramas) {
+          const totalAcoperit = totalNou + r;
+          const restFinal = totalAcoperit - necesar;
+          const score = [counts.reduce((s,x)=>s+x,0), restFinal];
+          if (!bestScore || scorBetter(score, bestScore)) {
+            bestScore = score;
+            best = buildResult(segs, counts, [r], restFinal, necesar);
+          }
+          break;
+        }
+      }
+      return;
+    }
+    for (let n = 0; n <= maxes[idx]; n++) {
+      const nou = totalNou + n * segs[idx];
+      if (nou > necesar * 2) break;
+      counts[idx] = n;
+      iterate(idx + 1, counts, nou);
+    }
+    counts[idx] = 0;
+  }
+  const counts = new Array(segs.length).fill(0);
+  iterate(0, counts, 0);
+  if (!best) best = greedyFallback(necesar, segs, restSort);
+  return best;
+}
+
+function scorBetter(a, b) { return a[0] !== b[0] ? a[0] < b[0] : a[1] < b[1]; }
+
+function buildResult(segs, counts, resturiF, restFinal, necesar) {
+  const pieces = [];
+  let ramas = necesar;
+  for (let i = 0; i < segs.length; i++) {
+    const n = counts[i], L = segs[i];
+    if (n === 0) continue;
+    for (let j = 0; j < n; j++) {
+      if (ramas <= 0) break;
+      const folosit = Math.min(L, ramas);
+      const restPiesa = L - folosit;
+      pieces.push({ kind:'new', lungime:L, folosit, rest:restPiesa, isPartial: restPiesa > 0 });
+      ramas -= folosit;
+    }
+  }
+  for (const r of resturiF) {
+    if (ramas <= 0) break;
+    const folosit = Math.min(r, ramas);
+    const restPiesa = r - folosit;
+    pieces.push({ kind:'rest', lungime:r, folosit, rest:restPiesa, isPartial: restPiesa > 0 });
+    ramas -= folosit;
+  }
+  let restNou = 0;
+  for (const p of pieces) { if (p.kind === 'new' && p.isPartial) restNou = p.rest; }
+  if (restFinal > 0 && restNou === 0) restNou = restFinal;
+  return { pieces, resturiF, restNou, totalAcoperit: necesar + restNou - ramas };
+}
+
+function greedyFallback(necesar, segs, restSort) {
+  const counts = new Array(segs.length).fill(0);
+  let ramas = necesar;
+  for (let i = 0; i < segs.length; i++) { counts[i] = Math.floor(ramas / segs[i]); ramas -= counts[i] * segs[i]; }
+  if (ramas > 0) counts[segs.length - 1]++;
+  return buildResult(segs, counts, [], 0, necesar);
+}
+
+// ══════════════════════════════════════════════════════════════
+// MAIN CALCULATE
+// ══════════════════════════════════════════════════════════════
+function calculeaza() {
+  const restMin = parseInt(document.getElementById('restMin').value) || 30;
+
+  // Build job list: each job = { label, necesar, circuitInfo? }
+  let jobs = [];
+
+  if (currentMode === 'simple') {
+    const raw = document.getElementById('inputNec').value;
+    const vals = raw.split(/[\n,;]+/).map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0);
+    if (!vals.length) { alert('Introduceți cel puțin un necesar!'); return; }
+    vals.forEach((v, i) => jobs.push({ label: `Linie #${i+1}`, necesar: v, circuitInfo: null }));
+  } else {
+    if (!circuits.length) { alert('Adăugați cel puțin un circuit!'); return; }
+    circuits.forEach(c => {
+      c.laturi.forEach((l, li) => {
+        jobs.push({
+          label: `${c.name} · Latura ${li+1}`,
+          necesar: l,
+          circuitInfo: { circuitId: c.id, circuitName: c.name, laturaIdx: li, tip: c.tip, totalLaturi: c.laturi.length }
+        });
+      });
+    });
+  }
+
+  // Process all jobs sharing the same rest pool
+  let resturi = [];
+  const rows = [];
+  const totalSeg = {};
+  getSegmente().forEach(s => totalSeg[s] = 0);
+  let totalConectoriLiniari = 0;
+  let totalConectoriColt = 0;
+
+  // Circuit-level connector tracking
+  const circuitConnInfo = {}; // circuitId → {liniari, colturi}
+
+  jobs.forEach((job, idx) => {
+    const rez = combinatiiOptime(job.necesar, resturi);
+    const resturiInainte = [...resturi];
+
+    rez.pieces.forEach(p => { if (p.kind === 'new') totalSeg[p.lungime] = (totalSeg[p.lungime]||0) + 1; });
+
+    // Linear connectors = pieces - 1 within this latura
+    const conectoriLiniari = Math.max(0, rez.pieces.length - 1);
+    totalConectoriLiniari += conectoriLiniari;
+
+    // Corner connectors: determined per circuit, not per latura
+    // We accumulate and compute after all laturi of a circuit are done
+    let conectoriColtPentruAceastaLatura = 0;
+    if (job.circuitInfo) {
+      const ci = job.circuitInfo;
+      if (!circuitConnInfo[ci.circuitId]) circuitConnInfo[ci.circuitId] = { tip: ci.tip, totalLaturi: ci.totalLaturi, colturi: 0 };
+      // Corner after this latura?
+      const isLastLatura = ci.laturaIdx === ci.totalLaturi - 1;
+      if (!isLastLatura) {
+        // corner between this latura and next
+        circuitConnInfo[ci.circuitId].colturi++;
+        conectoriColtPentruAceastaLatura = 1;
+        totalConectoriColt++;
+      } else if (ci.tip === 'closed') {
+        // closing corner
+        circuitConnInfo[ci.circuitId].colturi++;
+        conectoriColtPentruAceastaLatura = 1;
+        totalConectoriColt++;
+      }
+    }
+
+    // update rests
+    for (const rf of rez.resturiF) { const i = resturi.indexOf(rf); if (i >= 0) resturi.splice(i, 1); }
+    let restPastrat = false;
+    if (rez.restNou >= restMin) { resturi.push(rez.restNou); restPastrat = true; }
+
+    rows.push({ idx: idx+1, label: job.label, necesar: job.necesar, rez, conectoriLiniari, conectoriColt: conectoriColtPentruAceastaLatura, restPastrat, restMin, resturiInainte, circuitInfo: job.circuitInfo });
+  });
+
+  lastResults = { rows, totalSeg, totalConectoriLiniari, totalConectoriColt, resturiFinale:[...resturi], restMin, circuitConnInfo };
+  renderResults(lastResults);
+}
+
+// ══════════════════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════════════════
+function renderResults({ rows, totalSeg, totalConectoriLiniari, totalConectoriColt, resturiFinale, restMin, circuitConnInfo }) {
+  const list = document.getElementById('resultsList');
+  list.innerHTML = '';
+
+  rows.forEach(({ idx, label, necesar, rez, conectoriLiniari, conectoriColt, restPastrat, resturiInainte, circuitInfo }, ri) => {
+    const card = document.createElement('div');
+    card.className = 'rcard';
+    card.style.animationDelay = (ri * 0.05) + 's';
+
+    const exact = rez.restNou === 0 && !rez.pieces.some(p => p.isPartial);
+    const hasReuse = rez.resturiF.length > 0;
+
+    let badges = '';
+    if (exact) badges += '<span class="badge b-exact">Exact</span>';
+    else if (rez.restNou > 0) badges += `<span class="badge b-rest">Rest ${rez.restNou} cm</span>`;
+    if (hasReuse) badges += '<span class="badge b-reuse">♻ Reutilizare</span>';
+    if (conectoriLiniari > 0) badges += `<span class="badge b-conn">${conectoriLiniari} lin.</span>`;
+    if (conectoriColt > 0)    badges += `<span class="badge b-corner">${conectoriColt} colț</span>`;
+
+    const availStr = resturiInainte.length ? `resturi: [${resturiInainte.join(', ')}] cm` : '';
+
+    let circuitBadge = '';
+    if (circuitInfo) circuitBadge = `<span class="badge b-circuit">${circuitInfo.circuitName}</span>`;
+
+    card.innerHTML = `
+      <div class="rcard-head">
+        <span class="rcard-idx">#${idx}</span>
+        <span class="rcard-need">${label}: <strong>${necesar}</strong> <small>cm</small></span>
+        ${circuitBadge}${badges}
+        ${availStr ? `<span class="rcard-resturi-avail">${availStr}</span>` : ''}
+      </div>
+      <div class="rcard-body">
+        ${buildVisualBar(rez, necesar)}
+        ${buildFormulaLine(rez, necesar, conectoriLiniari, conectoriColt)}
+        ${buildInfoRow(rez, restPastrat, restMin, conectoriLiniari, conectoriColt)}
+      </div>`;
+    list.appendChild(card);
+  });
+
+  renderSummary({ totalSeg, totalConectoriLiniari, totalConectoriColt, resturiFinale, circuitConnInfo });
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({ behavior:'smooth' });
+}
+
+function buildVisualBar(rez, necesar) {
+  const total = rez.pieces.reduce((s,p) => s + p.lungime, 0);
+  let html = '<div class="vbar">';
+  rez.pieces.forEach(p => {
+    const pct = (p.lungime / total * 100).toFixed(1) + '%';
+    const cls = p.kind === 'rest'
+      ? (p.isPartial ? 'vb-rpart' : 'vb-rused')
+      : ({ 300: p.isPartial ? 'vb-300p' : 'vb-300n',
+           200: p.isPartial ? 'vb-200p' : 'vb-200n',
+           100: p.isPartial ? 'vb-100p' : 'vb-100n' }[p.lungime] || 'vb-200n');
+    const lbl = p.isPartial ? `${p.folosit}/${p.lungime}` : `${p.lungime}`;
+    html += `<div class="vbar-seg ${cls}" style="width:${pct}" title="${p.kind==='rest'?'♻ rest':'nou'} ${p.lungime}cm, folosit ${p.folosit}cm">${lbl}</div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+function buildFormulaLine(rez, necesar, conectoriLiniari, conectoriColt) {
+  let parts = [];
+  rez.pieces.forEach((p, pi) => {
+    if (pi > 0) parts.push('<span class="conn-dot" title="Conector liniar">C</span>');
+    let cls, label, sublabel;
+    if (p.kind === 'rest') {
+      cls = p.isPartial ? 'sb-rest-part' : 'sb-rest-used';
+      label = p.isPartial ? `${p.folosit} <span style="font-size:9px;opacity:.6">din ${p.lungime}</span>` : `${p.lungime}`;
+      sublabel = '♻ rest';
+    } else {
+      const colMap = { 300: p.isPartial ? 'sb-300-part' : 'sb-300-new',
+                       200: p.isPartial ? 'sb-200-part' : 'sb-200-new',
+                       100: p.isPartial ? 'sb-100-part' : 'sb-100-new' };
+      cls = colMap[p.lungime] || 'sb-200-new';
+      label = p.isPartial ? `${p.folosit} <span style="font-size:9px;opacity:.6">din ${p.lungime}</span>` : `${p.lungime}`;
+      sublabel = p.isPartial ? 'nou · tăiat' : 'nou · întreg';
+    }
+    parts.push(`<span class="seg-block ${cls}"><span class="sb-top">${label}</span><span class="sb-bot">${sublabel}</span></span>`);
+  });
+
+  parts.push(`<span class="formula-eq">=</span>`);
+  parts.push(`<span style="font-family:var(--mono);font-size:16px;font-weight:500">${necesar} cm</span>`);
+
+  if (rez.restNou > 0) {
+    const lastNew = [...rez.pieces].reverse().find(p => p.kind === 'new' && p.isPartial);
+    if (lastNew) parts.push(`<span style="font-family:var(--mono);font-size:11px;color:var(--ink3)">· rest din ${lastNew.lungime}: <strong style="color:var(--gold)">${lastNew.rest} cm</strong></span>`);
+  }
+
+  if (conectoriColt > 0) {
+    parts.push(`<span style="margin-left:4px;"></span>`);
+    parts.push(`<span class="corner-dot" title="Conector colț">↱</span>`);
+  }
+
+  return `<div class="formula-line">${parts.join('')}</div>`;
+}
+
+function buildInfoRow(rez, restPastrat, restMin, conectoriLiniari, conectoriColt) {
+  const items = [];
+  const newPieces = rez.pieces.filter(p => p.kind === 'new');
+  const rPieces   = rez.pieces.filter(p => p.kind === 'rest');
+
+  if (newPieces.length) {
+    const desc = newPieces.map(p => p.isPartial ? `${p.lungime}cm (tăiat la ${p.folosit})` : `${p.lungime}cm`).join(', ');
+    items.push(`<div class="info-item"><span class="il">Segmente noi</span><span class="iv blue">${desc}</span></div>`);
+  }
+  if (rPieces.length) {
+    const desc = rPieces.map(p => p.isPartial ? `${p.lungime}cm→${p.folosit}` : `${p.lungime}cm`).join(', ');
+    items.push(`<div class="info-item"><span class="il">Din resturi</span><span class="iv blue">♻ ${desc}</span></div>`);
+  }
+  if (rez.restNou > 0) {
+    const info = restPastrat ? `${rez.restNou} cm → păstrat` : `${rez.restNou} cm → sub ${restMin}cm`;
+    items.push(`<div class="info-item"><span class="il">Rest generat</span><span class="iv ${restPastrat?'gold':'accent'}">✂ ${info}</span></div>`);
+  } else {
+    items.push(`<div class="info-item"><span class="il">Rest generat</span><span class="iv green">0 cm · exact 🎯</span></div>`);
+  }
+  if (conectoriLiniari > 0)
+    items.push(`<div class="info-item"><span class="il">Con. liniari</span><span class="iv accent">${conectoriLiniari} buc</span></div>`);
+  if (conectoriColt > 0)
+    items.push(`<div class="info-item"><span class="il">Con. colț</span><span class="iv purple">${conectoriColt} buc</span></div>`);
+
+  return `<div class="info-row">${items.join('')}</div>`;
+}
+
+function renderSummary({ totalSeg, totalConectoriLiniari, totalConectoriColt, resturiFinale, circuitConnInfo }) {
+  const segs = getSegmente();
+  let segItems = '';
+  segs.forEach(s => {
+    const n = totalSeg[s] || 0;
+    if (n > 0) {
+      const colorMap = { 300:'blue', 200:'gold', 100:'' };
+      segItems += `<div class="sum-item ${colorMap[s]||''}"><div class="sl">Segmente ${s/100}m</div><div class="sv">${n}</div><div class="su">bucăți</div></div>`;
+    }
+  });
+  const totalMetri = segs.reduce((s,l) => s + (totalSeg[l]||0)*l, 0) / 100;
+  const totalConectori = totalConectoriLiniari + totalConectoriColt;
+
+  let restChips = resturiFinale.length
+    ? resturiFinale.map(r => `<span class="rest-chip">♻ ${r} cm</span>`).join('')
+    : '<span style="font-family:var(--mono);font-size:12px;color:#6a6560">Niciunul</span>';
+
+  document.getElementById('summaryDiv').innerHTML = `
+    <div class="summary">
+      <div class="sum-title">Sumar total necesar</div>
+      <div class="sum-grid">
+        ${segItems}
+        <div class="sum-item accent"><div class="sl">Con. liniari</div><div class="sv">${totalConectoriLiniari}</div><div class="su">bucăți</div></div>
+        <div class="sum-item purple"><div class="sl">Con. colț</div><div class="sv">${totalConectoriColt}</div><div class="su">bucăți</div></div>
+        <div class="sum-item accent"><div class="sl">Conectori total</div><div class="sv">${totalConectori}</div><div class="su">bucăți</div></div>
+        <div class="sum-item"><div class="sl">Material total</div><div class="sv">${totalMetri.toFixed(1)}</div><div class="su">metri liniari</div></div>
+      </div>
+      <div class="sum-restlist"><div class="sl">Resturi rămase</div><div class="rest-chips">${restChips}</div></div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// EXCEL EXPORT
+// ══════════════════════════════════════════════════════════════
+function exportExcel() {
+  if (!lastResults) return;
+  const { rows, totalSeg, totalConectoriLiniari, totalConectoriColt, resturiFinale } = lastResults;
+  const prodName = document.getElementById('prodName').value || 'Segmente';
+  const segs = getSegmente();
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Desfășurat
+  const data1 = [['#','Denumire','Necesar (cm)','Piese componente','Tăieri parțiale','Resturi refolosite','Rest generat (cm)','Rest păstrat?','Con. liniari','Con. colț']];
+  rows.forEach(({ idx, label, necesar, rez, conectoriLiniari, conectoriColt, restPastrat }) => {
+    const pieseTxt = rez.pieces.map(p => p.kind==='rest' ? (p.isPartial?`♻${p.lungime}→${p.folosit}cm`:`♻${p.lungime}cm`) : (p.isPartial?`${p.lungime}cm(tăiat ${p.folosit})`:`${p.lungime}cm`)).join(' + ');
+    const partialTxt = rez.pieces.filter(p=>p.isPartial).map(p=>`Din ${p.kind==='rest'?'rest ':'seg.'}${p.lungime}cm: folosit ${p.folosit}cm, rest ${p.rest}cm`).join('; ');
+    data1.push([idx, label, necesar, pieseTxt, partialTxt||'—', rez.resturiF.length?rez.resturiF.join(', '):'—', rez.restNou||0, rez.restNou>0?(restPastrat?'Da':'Nu'):'—', conectoriLiniari, conectoriColt]);
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet(data1);
+  ws1['!cols'] = [6,28,12,38,42,22,14,12,12,10].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws1, 'Desfășurat');
+
+  // Sheet 2: Sumar
+  const data2 = [['SUMAR — ' + prodName],[],['Tip segment','Bucăți','Total cm']];
+  segs.forEach(s => { const n=totalSeg[s]||0; if(n>0) data2.push([`${s/100}m (${s}cm)`,n,n*s]); });
+  data2.push([],[`Conectori liniari`,totalConectoriLiniari,''],[`Conectori colț`,totalConectoriColt,''],[`TOTAL conectori`,totalConectoriLiniari+totalConectoriColt,'']);
+  data2.push([],[`Material total (m)`,segs.reduce((s,l)=>s+(totalSeg[l]||0)*l,0)/100,'']);
+  data2.push([],[`Resturi rămase (cm)`],[resturiFinale.length?resturiFinale.join(', ')+' cm':'niciunul']);
+  const ws2 = XLSX.utils.aoa_to_sheet(data2);
+  ws2['!cols'] = [{wch:24},{wch:16},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Sumar');
+
+  XLSX.writeFile(wb, `segmente_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ══════════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════════
+function loadDemo() {
+  setMode(document.querySelector('.mtab'), 'simple');
+  document.getElementById('inputNec').value = '550, 400, 350, 210, 480';
+}
+function resetAll() {
+  document.getElementById('inputNec').value = '';
+  circuits = []; nextCircuitId = 1;
+  renderCircuitList();
+  document.getElementById('results').style.display = 'none';
+  lastResults = null;
+}
+</script>
+</body>
+</html>
