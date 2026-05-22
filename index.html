@@ -306,7 +306,8 @@ button {
   .sum-grid { grid-template-columns:1fr 1fr; }
   .acf-field input { width:90px; }
 }
-  ul {
+
+ul {
   list-style-type: none;
   margin: 0;
   padding: 0;
@@ -329,23 +330,22 @@ li a {
 li a:hover {
   background-color: #111111;
 }
+  
 </style>
 </head>
 <body>
 <div class="wrap">
 
   <header class="hdr">
-    <div class="hdr-sub">
+     <div class="hdr-sub">
     <ul>
   <li><a href="index.html">CALCULATOR PROFILE</a></li>
   <li><a href="calculator_banda.html">CALCULATOR BANDA</a></li>
     </ul>
       </div>
-
-    <div class="hdr-tag">Optimizare tăieri · v3.0</div>
+    <div class="hdr-tag"><br>Optimizare tăieri · v3.4</div>
     <h1>Calculator<br><em>Segmente</em></h1>
     <div class="hdr-sub">Tăieri parțiale · Conectori liniari &amp; de colț · Circuite compuse · Reutilizare resturi · Export Excel</div>
-    
   </header>
 
   <!-- SEGMENT TYPE -->
@@ -363,6 +363,9 @@ li a:hover {
       </button>
       <button class="tbtn" data-type="3" onclick="setType(this,'3')">
         <div class="tl">Tip D</div><div class="ts">doar 3m</div><div class="td">300 cm</div>
+      </button>
+      <button class="tbtn" data-type="25" onclick="setType(this,'25')">
+        <div class="tl">Tip E</div><div class="ts">doar 2,5m</div><div class="td">250 cm</div>
       </button>
     </div>
   </div>
@@ -509,6 +512,7 @@ function getSegmente() {
   if (currentType === '123') return [300, 200, 100];
   if (currentType === '23')  return [300, 200];
   if (currentType === '3')   return [300];
+  if (currentType === '25')  return [250];
   return [200];
 }
 
